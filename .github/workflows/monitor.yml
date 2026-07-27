@@ -1,9 +1,9 @@
 name: Inventory Monitor
 
 on:
-  workflow_dispatch:  # กดรันเอง
+  workflow_dispatch:
   # schedule:
-  #   - cron: '0 1 * * *'  # ทุกวัน 08:00 เวลาไทย — เปิดใช้เมื่อพร้อม
+  #   - cron: '0 1 * * *'
 
 permissions:
   contents: write
@@ -22,12 +22,18 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Write Google credentials
+        run: echo "$GOOGLE_CREDENTIALS" > /tmp/credentials.json
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+
       - name: Run monitor
         env:
-          GOOGLE_CREDENTIALS: '${{ secrets.GOOGLE_CREDENTIALS }}'
+          GOOGLE_CREDENTIALS: /tmp/credentials.json
           LINE_CHANNEL_ACCESS_TOKEN: '${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}'
           LINE_USER_ID: '${{ secrets.LINE_USER_ID }}'
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          DASHBOARD_URL: "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
         run: python inventory_monitor.py
 
       - name: Commit and push results
