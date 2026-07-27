@@ -30,11 +30,14 @@ BUYER_INFO = {
 
 # ===== Google Sheets =====
 
-def connect_sheets(credentials_json, spreadsheet_url):
-    """เชื่อมต่อ Google Sheets ด้วย service account (จาก JSON string)"""
+def connect_sheets(credentials_source, spreadsheet_url):
+    """เชื่อมต่อ Google Sheets ด้วย service account (รับ file path หรือ JSON string)"""
     scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
-    creds_dict = json.loads(credentials_json)
-    creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+    if os.path.isfile(credentials_source):
+        creds = Credentials.from_service_account_file(credentials_source, scopes=scopes)
+    else:
+        creds_dict = json.loads(credentials_source)
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
     client = gspread.authorize(creds)
     return client.open_by_url(spreadsheet_url)
 
