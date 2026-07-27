@@ -20,15 +20,13 @@
 
 ### LINE Notification
 
-<!-- แทนที่ด้วย screenshot จริง: ลาก/วางรูปที่นี่ตอน edit README บน GitHub -->
-> 📸 *เพิ่ม screenshot LINE notification ที่นี่*
+<img width="1912" height="1012" alt="21" src="https://github.com/user-attachments/assets/035d8c39-484c-494b-8911-d7418b43b141" />
+
 
 ### Dashboard
 
-<!-- แทนที่ด้วย screenshot จริง -->
-> 📸 *เพิ่ม screenshot Dashboard ที่นี่*
+<img width="850" height="885" alt="22" src="https://github.com/user-attachments/assets/e1ccbfe4-137d-4f3d-903e-d5f3521c41ba" />
 
----
 
 ## Workflow
 
