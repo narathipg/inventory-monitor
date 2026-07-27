@@ -22,10 +22,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - - name: Write Google credentials
+      - name: Write Google credentials
+        run: printenv GOOGLE_CREDENTIALS > /tmp/credentials.json
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
-        run: python3 -c "import os; open('/tmp/credentials.json','w').write(os.environ['GOOGLE_CREDENTIALS'])"
 
       - name: Run monitor
         env:
