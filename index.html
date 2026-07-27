@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Inventory Monitor Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI',Tahoma,sans-serif; background:#F8FAFC; color:#1F2937; }
+.header { background:#1E293B; color:#fff; padding:24px 32px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
+.header h1 { font-size:20px; font-weight:700; letter-spacing:-0.02em; }
+.header .sub { font-size:13px; color:#94A3B8; margin-top:2px; }
+.header .date { text-align:right; }
+.header .date-label { font-size:13px; color:#94A3B8; }
+.header .date-value { font-size:15px; font-weight:600; }
+.container { max-width:1100px; margin:0 auto; padding:24px 16px; }
+.kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:20px; }
+.kpi { background:#fff; border-radius:8px; padding:20px 24px; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+.kpi-label { font-size:13px; color:#6B7280; margin-bottom:4px; }
+.kpi-value { font-size:32px; font-weight:700; line-height:1.1; }
+.kpi-sub { font-size:12px; color:#9CA3AF; margin-top:4px; }
+.card { background:#fff; border-radius:8px; padding:24px; box-shadow:0 1px 3px rgba(0,0,0,0.08); margin-bottom:20px; }
+.card-title { font-size:15px; font-weight:600; margin-bottom:16px; }
+.anomaly { background:#FFFBEB; border-radius:8px; padding:20px; border:1px solid #FDE68A; margin-bottom:20px; }
+.anomaly-title { font-size:15px; font-weight:600; color:#92400E; margin-bottom:12px; }
+.anomaly-item { font-size:13px; color:#78350F; line-height:1.6; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th { padding:10px 12px; text-align:left; color:#6B7280; font-weight:600; white-space:nowrap; border-bottom:2px solid #E5E7EB; }
+td { padding:10px 12px; border-bottom:1px solid #F3F4F6; }
+tr.critical { background:#FEF2F2; }
+.badge { display:inline-block; padding:2px 10px; border-radius:99px; font-size:12px; font-weight:600; }
+.badge-critical { color:#DC2626; background:#FEF2F2; border:1px solid #FECACA; }
+.badge-urgent { color:#D97706; background:#FFFBEB; border:1px solid #FDE68A; }
+.badge-normal { color:#059669; background:#F0FDF4; border:1px solid #BBF7D0; }
+.below-reorder { color:#DC2626; font-weight:600; }
+.below-tag { font-size:11px; color:#DC2626; margin-left:6px; }
+.po-note { background:#EFF6FF; border:1px solid #BFDBFE; border-radius:8px; padding:16px 20px; margin-bottom:20px; font-size:14px; color:#1E40AF; }
+.footer { text-align:center; font-size:12px; color:#9CA3AF; padding:8px 0 16px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Inventory Monitor</h1>
+    <div class="sub" id="company"></div>
+  </div>
+  <div class="date">
+    <div class="date-label">วันที่วิเคราะห์</div>
+    <div class="date-value" id="report-date"></div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="kpi-grid" id="kpi-grid"></div>
+  <div class="card">
+    <div class="card-title">วันคงเหลือ vs Lead Time (เรียงตาม Material ID)</div>
+    <canvas id="stockChart" height="300"></canvas>
+  </div>
+  <div id="anomaly-section"></div>
+  <div id="po-section"></div>
+  <div class="card">
+    <div class="card-title">รายละเอียดสต็อกทั้งหมด</div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th>สถานะ</th><th>รหัส</th><th>ชื่อ</th><th>คงเหลือ</th>
+          <th>ใช้/วัน</th><th>เหลือ (วัน)</th><th>Lead Time</th><th>ซัพพลายเออร์</th>
+        </tr></thead>
+        <tbody id="stock-table"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="footer">สร้างโดย Inventory Monitor — ข้อมูลจาก Google Sheets + วิเคราะห์โดย Gemini AI</div>
+</div>
+
+<script>
+const D = {"date": "2026-07-27", "company": "บริษัทตัวอย่าง", "items": [{"id": "PK-001", "name": "ขวดครีม 30g", "stock": 2500, "unit": "ชิ้น", "reorder": 1000, "avg": 65.0, "days": 38.5, "lead": 7, "supplier": "บจก. แพ็คโปร", "urgency": "normal", "belowReorder": false}, {"id": "PK-002", "name": "ขวดครีม 50g", "stock": 300, "unit": "ชิ้น", "reorder": 500, "avg": 54.55, "days": 5.5, "lead": 7, "supplier": "บจก. แพ็คโปร", "urgency": "critical", "belowReorder": true}, {"id": "PK-003", "name": "กล่องบรรจุภัณฑ์", "stock": 4000, "unit": "ชิ้น", "reorder": 2000, "avg": 65.22, "days": 61.3, "lead": 5, "supplier": "บจก. ไทยแพ็คเกจจิ้ง", "urgency": "normal", "belowReorder": false}, {"id": "PK-004", "name": "ซองอาหารเสริม", "stock": 800, "unit": "ชิ้น", "reorder": 1000, "avg": 95.65, "days": 8.4, "lead": 10, "supplier": "บจก. ไทยแพ็คเกจจิ้ง", "urgency": "critical", "belowReorder": true}, {"id": "RM-001", "name": "คอลลาเจนผง", "stock": 45, "unit": "kg", "reorder": 30, "avg": 2.5, "days": 18.0, "lead": 7, "supplier": "บจก. ไทยเฮิร์บ ซัพพลาย", "urgency": "normal", "belowReorder": false}, {"id": "RM-002", "name": "กลูต้าไธโอนผง", "stock": 12, "unit": "kg", "reorder": 15, "avg": 0.62, "days": 19.4, "lead": 10, "supplier": "บจก. เคมีภัณฑ์สยาม", "urgency": "normal", "belowReorder": true}, {"id": "RM-003", "name": "วิตามินซี", "stock": 80, "unit": "kg", "reorder": 25, "avg": 1.67, "days": 48.0, "lead": 5, "supplier": "บจก. ไทยเฮิร์บ ซัพพลาย", "urgency": "normal", "belowReorder": false}, {"id": "RM-004", "name": "ไฮยาลูรอนิค แอซิด", "stock": 8, "unit": "liter", "reorder": 10, "avg": 0.33, "days": 24.0, "lead": 14, "supplier": "บจก. บิวตี้ อินกรีเดียนท์", "urgency": "normal", "belowReorder": true}], "anomalies": [{"id": "RM-001", "date": "2026-07-18", "qty": 15.0, "avg": 6.25, "ratio": 2.4}], "kpi": {"total": 8, "critical": 2, "urgent": 0, "normal": 6}, "poFile": "PO_draft.md"};
+
+document.getElementById('company').textContent = D.company;
+document.getElementById('report-date').textContent = D.date;
+
+// KPI Cards
+const kpiDefs = [
+  {label:'รายการทั้งหมด', value:D.kpi.total, color:'#1F2937', border:'#94A3B8'},
+  {label:'วิกฤต', value:D.kpi.critical, color:'#DC2626', border:'#DC2626', sub:'ต้องสั่งซื้อทันที'},
+  {label:'เร่งด่วน', value:D.kpi.urgent, color:'#D97706', border:'#D97706', sub:'เฝ้าระวัง'},
+  {label:'ปกติ', value:D.kpi.normal, color:'#059669', border:'#059669'},
+];
+const kpiGrid = document.getElementById('kpi-grid');
+kpiDefs.forEach(k => {
+  const div = document.createElement('div');
+  div.className = 'kpi';
+  div.style.borderLeft = '4px solid ' + k.border;
+  div.innerHTML = '<div class="kpi-label">' + k.label + '</div>'
+    + '<div class="kpi-value" style="color:' + k.color + '">' + k.value + '</div>'
+    + (k.sub ? '<div class="kpi-sub">' + k.sub + '</div>' : '');
+  kpiGrid.appendChild(div);
+});
+
+// Chart
+const ctx = document.getElementById('stockChart').getContext('2d');
+const items = D.items;
+new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels: items.map(i => i.id),
+    datasets: [
+      {
+        label: 'เหลือใช้ (วัน)',
+        data: items.map(i => i.days),
+        backgroundColor: items.map(i => i.urgency === 'critical' ? '#DC2626' : i.urgency === 'urgent' ? '#D97706' : '#3B82F6'),
+        borderRadius: 3,
+        barPercentage: 0.6,
+      },
+      {
+        label: 'Lead Time (วัน)',
+        data: items.map(i => i.lead),
+        backgroundColor: '#CBD5E1',
+        borderRadius: 3,
+        barPercentage: 0.6,
+      }
+    ]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { labels: { font: { size: 12 } } },
+      tooltip: {
+        callbacks: {
+          afterBody: function(ctx) {
+            const idx = ctx[0].dataIndex;
+            const item = items[idx];
+            const gap = item.days - item.lead;
+            return gap < 0
+              ? '\nขาดมือ ' + Math.abs(gap).toFixed(1) + ' วัน'
+              : '\nเพียงพอ +' + gap.toFixed(1) + ' วัน';
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { size: 12 }, callback: v => v + ' วัน' } },
+      y: { grid: { display: false }, ticks: { font: { size: 12 } } }
+    }
+  }
+});
+
+// Anomaly
+if (D.anomalies.length > 0) {
+  const sec = document.getElementById('anomaly-section');
+  let html = '<div class="anomaly"><div class="anomaly-title">⚠️ การใช้ผิดปกติ (Anomaly)</div>';
+  D.anomalies.forEach(a => {
+    html += '<div class="anomaly-item"><strong>' + a.id + '</strong> — วันที่ ' + a.date
+      + ' ใช้ ' + a.qty + ' (เฉลี่ย ' + a.avg + ', มากกว่า ' + a.ratio + 'x)</div>';
+  });
+  html += '</div>';
+  sec.innerHTML = html;
+}
+
+// PO Note
+if (D.poFile) {
+  document.getElementById('po-section').innerHTML =
+    '<div class="po-note">📄 ร่างใบสั่งซื้อบันทึกไว้ที่ <strong>' + D.poFile + '</strong></div>';
+}
+
+// Table
+const urgencyMap = {
+  critical: {icon:'🔴', label:'วิกฤต', cls:'badge-critical'},
+  urgent: {icon:'🟡', label:'เร่งด่วน', cls:'badge-urgent'},
+  normal: {icon:'🟢', label:'ปกติ', cls:'badge-normal'},
+};
+const tbody = document.getElementById('stock-table');
+items.forEach(m => {
+  const u = urgencyMap[m.urgency];
+  const tr = document.createElement('tr');
+  if (m.urgency === 'critical') tr.className = 'critical';
+  const stockClass = m.belowReorder ? ' class="below-reorder"' : '';
+  const belowTag = m.belowReorder ? '<span class="below-tag">▼ ต่ำกว่า reorder</span>' : '';
+  tr.innerHTML =
+    '<td><span class="badge ' + u.cls + '">' + u.icon + ' ' + u.label + '</span></td>'
+    + '<td style="font-family:monospace;font-weight:500">' + m.id + '</td>'
+    + '<td style="font-weight:500">' + m.name + '</td>'
+    + '<td' + stockClass + '>' + m.stock.toLocaleString() + ' ' + m.unit + belowTag + '</td>'
+    + '<td>' + m.avg + ' ' + m.unit + '</td>'
+    + '<td style="font-weight:600;color:' + (m.days < m.lead ? '#DC2626' : '#1F2937') + '">' + m.days + '</td>'
+    + '<td style="color:#6B7280">' + m.lead + ' วัน</td>'
+    + '<td style="color:#6B7280;font-size:12px">' + m.supplier + '</td>';
+  tbody.appendChild(tr);
+});
+</script>
+</body>
+</html>
