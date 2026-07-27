@@ -1,0 +1,40 @@
+name: Inventory Monitor
+
+on:
+  workflow_dispatch:  # กดรันเอง
+  # schedule:
+  #   - cron: '0 1 * * *'  # ทุกวัน 08:00 เวลาไทย — เปิดใช้เมื่อพร้อม
+
+permissions:
+  contents: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run monitor
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DASHBOARD_URL: "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+        run: python inventory_monitor.py
+
+      - name: Commit and push results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html PO_draft.md || true
+          git diff --cached --quiet || git commit -m "Update dashboard $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git push
